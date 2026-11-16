@@ -1,0 +1,36 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'paulniziolek/Heeler'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # A repo-specific deploy key allows upstream workflow-file updates.
+      # Never execute code from the mirrored branch.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: upstream
+          fetch-depth: 0
+          persist-credentials: true
+          ssh-key: ${{ secrets.UPSTREAM_SYNC_SSH_KEY }}
+      - name: Fast-forward upstream mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -c fetch.pruneTags=false fetch --no-tags https://github.com/ZingerLittleBee/Heeler.git \
+            refs/heads/main:refs/remotes/og/main
+          git merge-base --is-ancestor HEAD refs/remotes/og/main
+          git -c push.followTags=false push origin refs/remotes/og/main:refs/heads/upstream
